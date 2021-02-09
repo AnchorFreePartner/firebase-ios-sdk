@@ -44,11 +44,18 @@ NS_ASSUME_NONNULL_BEGIN
       @remarks This dictionary is to avoid unecessary keychain operations against legacy items.
    */
   NSMutableDictionary *_legacyEntryDeletedForKey;
+    
+#if TARGET_OS_OSX
+    NSUserDefaults *_defaults;
+#endif
 }
 
 - (id<FIRAuthStorage>)initWithService:(NSString *)service {
   self = [super init];
   if (self) {
+#if TARGET_OS_OSX
+      _defaults = [[NSUserDefaults alloc] init];
+#endif
     _service = [service copy];
     _legacyEntryDeletedForKey = [[NSMutableDictionary alloc] init];
   }
@@ -56,6 +63,10 @@ NS_ASSUME_NONNULL_BEGIN
 }
 
 - (nullable NSData *)dataForKey:(NSString *)key error:(NSError **_Nullable)error {
+#if TARGET_OS_OSX
+    return [_defaults valueForKey:key];
+#endif
+    
   if (!key.length) {
     [NSException raise:NSInvalidArgumentException format:@"%@", @"The key cannot be nil or empty."];
     return nil;
@@ -89,6 +100,10 @@ NS_ASSUME_NONNULL_BEGIN
 }
 
 - (BOOL)setData:(NSData *)data forKey:(NSString *)key error:(NSError **_Nullable)error {
+#if TARGET_OS_OSX
+    [_defaults setValue:data forKey:key];
+    return YES;
+#endif
   if (!key.length) {
     [NSException raise:NSInvalidArgumentException format:@"%@", @"The key cannot be nil or empty."];
     return NO;
@@ -103,7 +118,11 @@ NS_ASSUME_NONNULL_BEGIN
 }
 
 - (BOOL)removeDataForKey:(NSString *)key error:(NSError **_Nullable)error {
-  if (!key.length) {
+#if TARGET_OS_OSX
+    [_defaults removeObjectForKey:key];
+    return YES;
+#endif
+    if (!key.length) {
     [NSException raise:NSInvalidArgumentException format:@"%@", @"The key cannot be nil or empty."];
     return NO;
   }
@@ -119,6 +138,10 @@ NS_ASSUME_NONNULL_BEGIN
 #pragma mark - Private methods for non-sharing keychain operations
 
 - (nullable NSData *)itemWithQuery:(NSDictionary *)query error:(NSError **_Nullable)error {
+#if TARGET_OS_OSX
+    return [_defaults valueForKey:query[(__bridge id)kSecAttrAccount]];
+#endif
+    
   NSMutableDictionary *returningQuery = [query mutableCopy];
   returningQuery[(__bridge id)kSecReturnData] = @YES;
   returningQuery[(__bridge id)kSecReturnAttributes] = @YES;
@@ -249,6 +272,10 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (nullable NSData *)getItemWithQuery:(NSDictionary *)query
                                 error:(NSError *_Nullable *_Nullable)outError {
+#if TARGET_OS_OSX
+    return [_defaults valueForKey:query[(__bridge id)kSecAttrAccount]];
+#endif
+    
   NSMutableDictionary *mutableQuery = [query mutableCopy];
 
   mutableQuery[(__bridge id)kSecReturnData] = @YES;
@@ -292,6 +319,10 @@ NS_ASSUME_NONNULL_BEGIN
 - (BOOL)setItem:(NSData *)item
       withQuery:(NSDictionary *)query
           error:(NSError *_Nullable *_Nullable)outError {
+#if TARGET_OS_OSX
+    [_defaults setValue:item forKey:query[(__bridge id)kSecAttrAccount]];
+#endif
+    
   NSData *existingItem = [self getItemWithQuery:query error:outError];
   if (outError && *outError) {
     return NO;
@@ -322,6 +353,10 @@ NS_ASSUME_NONNULL_BEGIN
 }
 
 - (BOOL)removeItemWithQuery:(NSDictionary *)query error:(NSError *_Nullable *_Nullable)outError {
+#if TARGET_OS_OSX
+    [_defaults removeObjectForKey:query[(__bridge id)kSecAttrAccount]];
+#endif
+    
   OSStatus status = SecItemDelete((__bridge CFDictionaryRef)query);
 
   if (status == noErr || status == errSecItemNotFound) {
